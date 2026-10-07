@@ -24,22 +24,12 @@ class WebService
     {
 
         $user_coords = $request->get_parameter('user_coords');
-        if ($user_coords == null)
+        if ($user_coords === null)
             throw new ParamMissing('user_coords');
-        $parts = explode('|', $user_coords);
-        if (count($parts) != 2)
-            throw new InvalidParam('user_coords', "Expecting 2 pipe-separated parts, got ".count($parts).".");
-        foreach ($parts as &$part_ref)
-        {
-            if (!preg_match("/^-?[0-9]+(\.?[0-9]*)$/", $part_ref))
-                throw new InvalidParam('user_coords', "'$part_ref' is not a valid float number.");
-            $part_ref = floatval($part_ref);
-        }
-        list($latitude, $longitude) = $parts;
-        if ($latitude < -90 || $latitude > 90)
-            throw new InvalidParam('user_coords', "Latitude '$latitude' is out of range (-90 to 90).");
-        if ($longitude < -180 || $longitude > 180)
-            throw new InvalidParam('user_coords', "Longitude '$longitude' is out of range (-180 to 180).");
+        $remove = ($user_coords === '');
+        $latitude = $longitude = null;
+        if (!$remove)
+            list($latitude, $longitude) = self::parse_coords($user_coords);
 
         # Verify cache_code
 
@@ -55,14 +45,48 @@ class WebService
         );
         $cache_id = $geocache['internal_id'];
 
-        self::validate_cache_type($geocache['type']);
+        if ($remove) {
+            self::remove_coordinates($cache_id, $request->token->user_id);
+        } else {
+            self::validate_cache_type($geocache['type']);
+            self::update_coordinates($cache_id, $request->token->user_id, $latitude, $longitude);
+        }
 
-        self::update_coordinates($cache_id, $request->token->user_id, $latitude, $longitude);
+        # Report the stored state, read back the same way services/caches/geocache does.
 
+        $geocache = OkapiServiceRunner::call(
+            'services/caches/geocache',
+            new OkapiInternalRequest($request->consumer, $request->token, array(
+                'cache_code' => $cache_code,
+                'fields' => 'my_coords'
+            ))
+        );
         $result = array(
-            'success' => true
+            'success' => true,
+            'my_coords' => $geocache['my_coords'],
         );
         return Okapi::formatted_response($request, $result);
+    }
+
+    private static function parse_coords($user_coords)
+    {
+        $parts = explode('|', $user_coords);
+        if (count($parts) != 2)
+            throw new InvalidParam('user_coords', "Expecting 2 pipe-separated parts, got ".count($parts).".");
+        foreach ($parts as &$part_ref)
+        {
+            if (!preg_match("/^-?[0-9]+(\.?[0-9]*)$/", $part_ref))
+                throw new InvalidParam('user_coords', "'$part_ref' is not a valid float number.");
+            $part_ref = floatval($part_ref);
+        }
+        list($latitude, $longitude) = $parts;
+        if ($latitude < -90 || $latitude > 90)
+            throw new InvalidParam('user_coords', "Latitude '$latitude' is out of range (-90 to 90).");
+        if ($longitude < -180 || $longitude > 180)
+            throw new InvalidParam('user_coords', "Longitude '$longitude' is out of range (-180 to 180).");
+        if ($latitude == 0 && $longitude == 0)
+            throw new InvalidParam('user_coords', "'0|0' is not a valid location. Use an empty string to remove the coordinates.");
+        return array($latitude, $longitude);
     }
 
     private static function validate_cache_type($cache_type)
@@ -78,6 +102,42 @@ class WebService
                 'cache_code',
                 "User coordinates are not supported for cache type '$cache_type'."
             );
+        }
+    }
+
+    private static function remove_coordinates($cache_id, $user_id)
+    {
+        if (Settings::get('OC_BRANCH') == 'oc.de')
+        {
+            # The type-2 row also holds the personal note. Like the website
+            # (HandlerCacheNote), drop the row only if the note is empty too,
+            # otherwise keep the note and store 0/0 ("no coordinates").
+
+            Db::query("
+                delete from coordinates
+                where
+                    type = 2
+                    and cache_id = '".Db::escape_string($cache_id)."'
+                    and user_id = '".Db::escape_string($user_id)."'
+                    and (description is null or description = '')
+            ");
+            Db::query("
+                update coordinates
+                set latitude = 0, longitude = 0
+                where
+                    type = 2
+                    and cache_id = '".Db::escape_string($cache_id)."'
+                    and user_id = '".Db::escape_string($user_id)."'
+            ");
+        }
+        else # oc.pl branch
+        {
+            Db::query("
+                delete from cache_mod_cords
+                where
+                    cache_id = '".Db::escape_string($cache_id)."'
+                    and user_id = '".Db::escape_string($user_id)."'
+            ");
         }
     }
 
