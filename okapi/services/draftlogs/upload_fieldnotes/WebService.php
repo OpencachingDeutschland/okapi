@@ -14,6 +14,24 @@ use okapi\Settings;
 
 class WebService
 {
+    # Log type names in field notes => field_note.type, as the OCDE website's own field
+    # notes upload maps them (oc-server3: Oc\FieldNotes\Enum\LogType). The website handles
+    # exactly these four types when a draft is turned into a log. Names are matched
+    # case-insensitively; both the geocaching.com names used in field note files (Garmin,
+    # cgeo, ...) and the OKAPI names are accepted. Records with other types are skipped.
+    private static $fieldnote_types = [
+        'found it'          => 1,
+        'attended'          => 1,     # the website logs "Found" on an event as "Attended"
+        "didn't find it"    => 2,
+        'write note'        => 3,
+        'comment'           => 3,
+        'owner maintenance' => 3,
+        'needs maintenance' => 1000,  # a note with "needs maintenance" set
+    ];
+
+    # field_note.text is varchar(255)
+    const MAX_TEXT_LENGTH = 255;
+
     public static function options()
     {
         return array(
@@ -99,10 +117,10 @@ class WebService
             }
             $date = date("Y-m-d H:i:s", $date_timestamp);
 
-            $type        = Okapi::logtypename2id($n['type']);
+            $type        = $n['type'];
             $user_id     = $request->token->user_id;
             $geocache_id = $geocache['internal_id'];
-            $text        = $n['log'];
+            $text        = self::to_html($n['log'], self::MAX_TEXT_LENGTH);
 
             Db::query("
                 insert into field_note (
@@ -150,7 +168,6 @@ class WebService
     private static function parse_notes($field_notes)
     {
         $lines = self::parse_csv($field_notes);
-        $submittable_logtype_names = Okapi::get_submittable_logtype_names();
         $records       = [];
         $total_records = 0;
 
@@ -164,11 +181,11 @@ class WebService
             if (strpos($code, 'OC') !== 0) continue;  // other platform (GC, OP, ...); this service is OCDE-only
 
             $date = $fields[1];
-            $type = $fields[2];
+            $type_name = mb_strtolower(trim($fields[2]), 'UTF-8');
+            if (!isset(self::$fieldnote_types[$type_name])) continue;
+            $type = self::$fieldnote_types[$type_name];
 
-            if (!in_array($type, $submittable_logtype_names)) continue;
-
-            $log = mb_substr($fields[3], 0, 255);
+            $log = $fields[3];
 
             $records[] = [
                 'code' => $code,
@@ -221,6 +238,37 @@ class WebService
             $output[] = trim($buffer);
         }
         return $output;
+    }
+
+    // ------------------------------------------------------------------
+    // The website loads a draft into its HTML log editor, so store the text
+    // the way the website's own field notes upload does: line breaks as <br />.
+    // Unlike the website, also escape <, > and &, so the text shows as written.
+    // If the result is too long for the column, use the longest prefix of the
+    // plain text (not of the HTML) that fits, so no tag or entity is cut in half.
+
+    private static function to_html($text, $max_length)
+    {
+        $text = str_replace("\r\n", "\n", $text);
+        $html = self::text2html($text);
+        if (mb_strlen($html, 'UTF-8') <= $max_length)
+            return $html;
+
+        $fits = 0;                                # longest prefix length known to fit
+        $too_long = mb_strlen($text, 'UTF-8');    # shortest prefix length known not to fit
+        while ($too_long - $fits > 1) {
+            $middle = intdiv($fits + $too_long, 2);
+            if (mb_strlen(self::text2html(mb_substr($text, 0, $middle, 'UTF-8')), 'UTF-8') <= $max_length)
+                $fits = $middle;
+            else
+                $too_long = $middle;
+        }
+        return self::text2html(mb_substr($text, 0, $fits, 'UTF-8'));
+    }
+
+    private static function text2html($text)
+    {
+        return nl2br(htmlspecialchars($text, ENT_NOQUOTES, 'UTF-8'));
     }
 
     // ------------------------------------------------------------------

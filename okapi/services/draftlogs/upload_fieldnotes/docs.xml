@@ -20,10 +20,21 @@
         <ol>
             <li><b>Geocache Code</b> - e.g. <tt>OC1012</tt></li>
             <li><b>Date</b> - ISO 8601 UTC, e.g. <tt>2023-11-23T10:17:55Z</tt></li>
-            <li><b>Log Type</b> - must match a value from the <b>log_types</b> list in
-            <a href="%OKAPI:methodargref:services/apisrv/installation%">services/apisrv/installation</a>
-            (case sensitive). Records with unrecognized log types are silently skipped.</li>
-            <li><b>Log Text</b> - may span multiple lines and contain quote characters.</li>
+            <li><b>Log Type</b> - matched case-insensitively. Both the names used by
+            geocaching.com field note files (as written by Garmin devices, cgeo and other
+            apps) and the OKAPI log type names are accepted. They are mapped to the draft
+            log types of the website:
+                <ul>
+                    <li><i>Found it</i>, <i>Attended</i> - found (on events, the website
+                    turns it into an <i>Attended</i> log),</li>
+                    <li><i>Didn't find it</i> - didn't find it,</li>
+                    <li><i>Write note</i>, <i>Comment</i>, <i>Owner Maintenance</i> - comment,</li>
+                    <li><i>Needs Maintenance</i> - comment with "needs maintenance" set.</li>
+                </ul>
+            Records with other log types are silently skipped.</li>
+            <li><b>Log Text</b> - may span multiple lines and contain quote characters.
+            It is stored as HTML (line breaks become &lt;br /&gt;), as the website's own
+            field notes upload does, and shortened to 255 characters.</li>
         </ol>
         <p>Character encoding is detected automatically. Supported encodings: UTF-8
         (with or without BOM), UTF-16LE (with or without BOM), UTF-16BE (with BOM).
