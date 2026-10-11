@@ -20,6 +20,10 @@ class WebService
 
     public static function call(OkapiRequest $request)
     {
+        # Writes the OCDE database layout; other installations would fail half-way.
+        if (Settings::get('OC_BRANCH') != 'oc.de')
+            throw new BadRequest('This method is not supported in this OKAPI installation.');
+
         $user_id = $request->token->user_id;
 
         # Validate cache_code parameter

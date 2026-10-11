@@ -1,5 +1,6 @@
 <xml>
     <brief>Archive/delete a geocache</brief>
+    <infotags>ocde-specific</infotags>
     <issue-id></issue-id>
     <desc>
         <p>This method allows the cache owner to archive a geocache.

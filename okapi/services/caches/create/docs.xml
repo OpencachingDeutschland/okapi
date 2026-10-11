@@ -1,5 +1,6 @@
 <xml>
     <brief>Create a new geocache</brief>
+    <infotags>ocde-specific</infotags>
     <issue-id></issue-id>
     <desc>
         <p>This method allows users to create a new geocache.</p>

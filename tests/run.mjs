@@ -84,10 +84,10 @@ await check('installation: basic fields', async () => {
   dumps.push(['services/apisrv/installation', j]);
   assert(typeof j.site_name === 'string', 'site_name missing');
   assert(typeof j.okapi_base_url === 'string', 'okapi_base_url missing');
-  // A git checkout reports a number; standalone/dev setups may report a string such as "1.0.0".
-  assert(j.okapi_version_number !== undefined && j.okapi_version_number !== null, 'okapi_version_number missing');
+  // A release reports a number; dev setups may report a string such as "1.0.0", or nothing
+  // when OKAPI runs from a plain source checkout. Check the deployed version with --expect-revision.
   const flags = Object.entries(j).filter(([k]) => k.startsWith('has_')).map(([k, v]) => `${k}=${v}`).join(' ');
-  return `${j.site_name}, revision ${j.okapi_git_revision ?? j.okapi_revision}; ${flags}`;
+  return `${j.site_name}, revision ${j.okapi_git_revision ?? j.okapi_revision ?? '(none)'}; ${flags}`;
 });
 
 await check('installation: expected revision', async () => {
@@ -154,7 +154,11 @@ await check('level 1: logs/logs', async () => {
 
 await check('level 3 PLAINTEXT: users/user', async () => {
   needToken();
-  const j = okJson(await api.request('services/users/user', { fields: 'uuid|username' }, { auth: 'plaintext' }), 'users/user');
+  const res = await api.request('services/users/user', { fields: 'uuid|username' }, { auth: 'plaintext' });
+  // OKAPI allows PLAINTEXT only over HTTPS (dev installations may relax this in DEBUG mode).
+  if (target.baseUrl.startsWith('http:') && res.status === 400 && /only over HTTPS/.test(res.text))
+    skip('PLAINTEXT needs HTTPS; this target uses plain HTTP');
+  const j = okJson(res, 'users/user');
   assert(j.uuid && j.username, 'uuid/username missing');
   ctx.user = j;
   return j.username;
@@ -230,11 +234,16 @@ if (write) {
 
   await check('write: caches/create', async () => {
     needToken();
-    const j = await post('services/caches/create', {
+    const params = {
       cache_name: `okapi-test ${stamp}`, cache_type: 'Traditional', latitude: lat, longitude: lon,
       difficulty: '1.5', terrain: '1.5', size2: 'micro',
       short_description: 'Created by the OKAPI test suite; archived again at the end of the run.',
-    }, 'caches/create');
+    };
+    const res = await api.request('services/caches/create', params, { auth: 'hmac', method: 'POST' });
+    // caches/create, update and delete exist for OCDE only.
+    if (res.status === 400 && /not supported in this OKAPI installation/.test(res.text))
+      skip('caches/create is not supported by this installation (OCDE only)');
+    const j = okJson(res, 'caches/create');
     assert(j.cache_code, `no cache_code: ${JSON.stringify(j)}`);
     w.code = j.cache_code;
     const c = await read('code|name|status|owner');
