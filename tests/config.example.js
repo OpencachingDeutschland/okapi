@@ -5,6 +5,8 @@ export const consumerSecret = 'YOUR_CONSUMER_SECRET';
 export const accessToken    = 'YOUR_ACCESS_TOKEN';
 export const tokenSecret    = 'YOUR_TOKEN_SECRET';
 export const baseUrl        = 'https://okapi.example.org';
+// Allow run.mjs --write on this target (dev/test installations only, never production).
+export const allowWrite     = false;
 
 // Optional named targets for run.mjs (`node run.mjs --target prod`). Each needs its own
 // credentials, issued by that installation. Leave fields empty to skip the levels that
@@ -16,5 +18,6 @@ export const targets = {
     consumerSecret: '',
     accessToken:    '',
     tokenSecret:    '',
+    allowWrite:     false,   // never true for production
   },
 };

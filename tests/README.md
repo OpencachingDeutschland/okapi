@@ -39,6 +39,32 @@ Levels whose credentials a target lacks are skipped, not failed. Credentials are
 per installation: get a consumer key from the installation's `okapi/signup.html`
 and an access token for your test user.
 
+## Regression suite (writing level)
+
+```bash
+node run.mjs --write                      # read-only checks, then the writing level
+```
+
+Only for dev and test installations. `--write` is refused unless the target is
+marked `allowWrite: true` in `config.js` (`export const allowWrite = true` for the
+default target, or `allowWrite: true` in a named target). Never set it for production.
+
+The writing level works on its own test cache, so it touches no one else's data:
+1. `caches/create` a cache `okapi-test <timestamp>` owned by the test user
+   (location: `writeLocation` in the target, `'lat|lon'`, default N52.327 E9.543)
+2. `caches/update` name and difficulty, read back
+3. `caches/save_user_coords`: set, read back via `my_coords`, remove
+4. `caches/save_personal_notes`: set, read back, clear
+5. `lists/*`: create, add the cache, get, remove, delete the list
+6. `draftlogs/upload_fieldnotes` with one hybrid file (UTF-16LE, GC log type names,
+   records of other platforms): checks `total_records` and `processed_records`
+7. `logs/submit` a Comment, `logs/edit`, `logs/delete`
+8. `caches/delete`: the test cache is archived, always last
+
+Left behind per run: the archived test cache and three draft logs (OKAPI has no
+service to delete drafts). Step 7 is skipped in OKAPI standalone mode, where
+`logs/submit` lacks the website's `OcHTMLPurifier`.
+
 ## Finding a valid cache code
 
 ```bash

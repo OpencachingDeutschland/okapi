@@ -1,8 +1,11 @@
-// OKAPI regression suite, read-only level: safe to run against any installation, including production.
+// OKAPI regression suite.
+// Read-only level: safe against any installation, including production.
+// Writing level (--write): only on targets marked allowWrite: true (dev VM, test server).
 //
 //   node run.mjs                      # the default target from config.js
 //   node run.mjs --target prod        # a named target from `targets` in config.js
 //   node run.mjs --expect-revision 3b41888
+//   node run.mjs --write              # also run the writing level
 //
 // Exit code 0 = all checks passed, 1 = at least one failed, 2 = setup error.
 import * as config from './config.js';
@@ -23,13 +26,18 @@ function loadTarget(name) {
     }
     return t;
   }
-  const { baseUrl, consumerKey, consumerSecret, accessToken, tokenSecret } = config;
-  return { baseUrl, consumerKey, consumerSecret, accessToken, tokenSecret };
+  const { baseUrl, consumerKey, consumerSecret, accessToken, tokenSecret, allowWrite, writeLocation } = config;
+  return { baseUrl, consumerKey, consumerSecret, accessToken, tokenSecret, allowWrite, writeLocation };
 }
 
 const targetName = opt('target');
 const target = loadTarget(targetName);
 const expectRevision = opt('expect-revision');
+const write = args.includes('--write');
+if (write && target.allowWrite !== true) {
+  console.error(`--write refused: target${targetName ? ` '${targetName}'` : ''} is not marked allowWrite: true in config.js.`);
+  process.exit(2);
+}
 const api = new OkapiClient(target);
 
 // --- tiny test harness -------------------------------------------------------
@@ -196,6 +204,137 @@ await check('level 3: user coordinates field (has_user_coords)', async () => {
   assert('my_coords' in j, 'my_coords missing');
   return `my_coords=${j.my_coords}`;
 });
+
+// --- writing level (--write) ------------------------------------------------
+// Works on its own test cache, created first and archived last, so it touches no one
+// else's data. Everything it creates is removed again, except: the archived test cache
+// and the draft logs from the field notes upload (OKAPI has no service to delete drafts).
+
+if (write) {
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15);
+  const [lat, lon] = (target.writeLocation ?? '52.327366|9.543').split('|');
+  const w = {};  // state of the writing level
+  const post = async (path, params, what) =>
+    okJson(await api.request(path, params, { auth: 'hmac', method: 'POST' }), what);
+  const read = async fields =>
+    okJson(await api.request('services/caches/geocache', { cache_code: w.code, fields }, { auth: 'hmac' }), 'geocache');
+  const needCache = () => { needToken(); if (!w.code) skip('no test cache'); };
+
+  await check('write: caches/create', async () => {
+    needToken();
+    const j = await post('services/caches/create', {
+      cache_name: `okapi-test ${stamp}`, cache_type: 'Traditional', latitude: lat, longitude: lon,
+      difficulty: '1.5', terrain: '1.5', size2: 'micro',
+      short_description: 'Created by the OKAPI test suite; archived again at the end of the run.',
+    }, 'caches/create');
+    assert(j.cache_code, `no cache_code: ${JSON.stringify(j)}`);
+    w.code = j.cache_code;
+    const c = await read('code|name|status|owner');
+    assert(c.owner.uuid === ctx.user?.uuid, 'test cache is not owned by the test user');
+    return `${w.code} (${c.status})`;
+  });
+
+  await check('write: caches/update', async () => {
+    needCache();
+    const name = `okapi-test ${stamp} (updated)`;
+    await post('services/caches/update', { cache_code: w.code, cache_name: name, difficulty: '2.5' }, 'caches/update');
+    const c = await read('name|difficulty');
+    assert(c.name === name, `name is '${c.name}'`);
+    assert(Number(c.difficulty) === 2.5, `difficulty is ${c.difficulty}`);
+    return 'name and difficulty changed';
+  });
+
+  await check('write: save_user_coords set and remove', async () => {
+    needCache();
+    if (!ctx.installation?.has_user_coords) skip('installation has no has_user_coords');
+    const coords = `${(Number(lat) + 0.001).toFixed(6)}|${(Number(lon) + 0.001).toFixed(6)}`;
+    await post('services/caches/save_user_coords', { cache_code: w.code, user_coords: coords }, 'set');
+    const set = (await read('my_coords')).my_coords;
+    const same = (a, b) => a.split('|').every((v, i) => Math.abs(Number(v) - Number(b.split('|')[i])) < 1e-6);
+    assert(set && same(set, coords), `my_coords is ${set}, expected ${coords}`);
+    await post('services/caches/save_user_coords', { cache_code: w.code, user_coords: '' }, 'remove');
+    const removed = (await read('my_coords')).my_coords;
+    assert(removed === null, `my_coords is ${removed} after removal`);
+    return `${coords}, then removed`;
+  });
+
+  await check('write: save_personal_notes set and clear', async () => {
+    needCache();
+    const note = `okapi-test note ${stamp} äöü`;
+    await post('services/caches/save_personal_notes', { cache_code: w.code, new_value: note }, 'set');
+    const set = (await read('my_notes')).my_notes;
+    assert(set === note, `my_notes is ${JSON.stringify(set)}`);
+    await post('services/caches/save_personal_notes', { cache_code: w.code, new_value: '', old_value: note }, 'clear');
+    const cleared = (await read('my_notes')).my_notes;
+    assert(cleared === null || cleared === '', `my_notes is ${JSON.stringify(cleared)} after clearing`);
+    return 'set, then cleared';
+  });
+
+  await check('write: lists create/add/get/remove/delete', async () => {
+    needCache();
+    if (!ctx.installation?.has_lists) skip('installation has no has_lists');
+    const list = await post('services/lists/create', { list_name: `okapi-test ${stamp}`, list_status: 'private' }, 'lists/create');
+    assert(list.list_id, 'no list_id');
+    try {
+      await post('services/lists/add_caches', { list_id: list.list_id, cache_codes: w.code }, 'add_caches');
+      const got = await post('services/lists/get_caches', { list_id: list.list_id }, 'get_caches');
+      assert((got.cache_codes ?? '').split('|').includes(w.code), `cache not in list: ${JSON.stringify(got)}`);
+      await post('services/lists/remove_caches', { list_id: list.list_id, cache_codes: w.code }, 'remove_caches');
+    } finally {
+      await post('services/lists/delete', { list_id: list.list_id }, 'lists/delete');
+    }
+    return 'list created, cache added and removed, list deleted';
+  });
+
+  await check('write: draftlogs/upload_fieldnotes (hybrid file)', async () => {
+    needCache();
+    if (!ctx.installation?.has_draft_logs) skip('installation has no has_draft_logs');
+    // One hybrid file as c:geo/Garmin write it: UTF-16LE, GC log type names, records of other platforms included.
+    const records = [
+      ['GC12345', 'Found it', 'TFTC', false],
+      [w.code, 'Found it', 'Grüße, Straße ß', true],
+      [w.code, 'Write note', "Zeile 1\nZeile 2 mit 'Zitat' <3", true],
+      [w.code, 'Needs Maintenance', 'Logbuch voll', true],
+      ['OP1234', 'Found it', 'Dzięki', false],
+    ];
+    const content = records.map(([code, type, text], i) => `${code},2024-05-01T10:2${i}:00Z,${type},"${text}"`).join('\n') + '\n';
+    const j = await post('services/draftlogs/upload_fieldnotes',
+      { field_notes: Buffer.from(content, 'utf16le').toString('base64') }, 'upload_fieldnotes');
+    const expected = records.filter(r => r[3]).length;
+    assert(j.success === true, `success is ${j.success}`);
+    assert(j.total_records === records.length, `total_records ${j.total_records}, expected ${records.length}`);
+    assert(j.processed_records === expected, `processed_records ${j.processed_records}, expected ${expected}`);
+    return `${j.processed_records} of ${j.total_records} records became drafts (left behind: no delete service)`;
+  });
+
+  await check('write: logs/submit, edit, delete', async () => {
+    needCache();
+    const res = await api.request('services/logs/submit',
+      { cache_code: w.code, logtype: 'Comment', comment: `okapi-test log ${stamp}` }, { auth: 'hmac', method: 'POST' });
+    // Known gap: OKAPI in standalone mode lacks the website's OcHTMLPurifier.
+    if (/OcHTMLPurifier/.test(res.text)) skip('not possible in OKAPI standalone mode (OcHTMLPurifier missing)');
+    const j = okJson(res, 'logs/submit');
+    assert(j.success === true && j.log_uuids?.length, `submit failed: ${j.message ?? JSON.stringify(j)}`);
+    const uuid = j.log_uuids[0];
+    try {
+      const e = await post('services/logs/edit', { log_uuid: uuid, comment: `okapi-test log ${stamp} (edited)` }, 'logs/edit');
+      assert(e.success === true, `edit failed: ${e.message ?? JSON.stringify(e)}`);
+    } finally {
+      const d = await post('services/logs/delete', { log_uuid: uuid }, 'logs/delete');
+      assert(d.success === true, `delete failed: ${d.message ?? JSON.stringify(d)}`);
+    }
+    return `log ${uuid} submitted, edited, deleted`;
+  });
+
+  // Always last: archive the test cache, even if checks above failed.
+  await check('write: caches/delete (archive the test cache)', async () => {
+    needCache();
+    await post('services/caches/delete', { cache_code: w.code, reason: 'okapi test suite cleanup' }, 'caches/delete');
+    const c = await read('status');
+    assert(c.status === 'Archived', `status is ${c.status}`);
+    return `${w.code} archived`;
+  });
+}
 
 // --- report ------------------------------------------------------------------
 
