@@ -84,10 +84,10 @@ await check('installation: basic fields', async () => {
   dumps.push(['services/apisrv/installation', j]);
   assert(typeof j.site_name === 'string', 'site_name missing');
   assert(typeof j.okapi_base_url === 'string', 'okapi_base_url missing');
-  // A git checkout reports a number; standalone/dev setups may report a string such as "1.0.0".
-  assert(j.okapi_version_number !== undefined && j.okapi_version_number !== null, 'okapi_version_number missing');
+  // A release reports a number; dev setups may report a string such as "1.0.0", or nothing
+  // when OKAPI runs from a plain source checkout. Check the deployed version with --expect-revision.
   const flags = Object.entries(j).filter(([k]) => k.startsWith('has_')).map(([k, v]) => `${k}=${v}`).join(' ');
-  return `${j.site_name}, revision ${j.okapi_git_revision ?? j.okapi_revision}; ${flags}`;
+  return `${j.site_name}, revision ${j.okapi_git_revision ?? j.okapi_revision ?? '(none)'}; ${flags}`;
 });
 
 await check('installation: expected revision', async () => {
@@ -154,7 +154,11 @@ await check('level 1: logs/logs', async () => {
 
 await check('level 3 PLAINTEXT: users/user', async () => {
   needToken();
-  const j = okJson(await api.request('services/users/user', { fields: 'uuid|username' }, { auth: 'plaintext' }), 'users/user');
+  const res = await api.request('services/users/user', { fields: 'uuid|username' }, { auth: 'plaintext' });
+  // OKAPI allows PLAINTEXT only over HTTPS (dev installations may relax this in DEBUG mode).
+  if (target.baseUrl.startsWith('http:') && res.status === 400 && /only over HTTPS/.test(res.text))
+    skip('PLAINTEXT needs HTTPS; this target uses plain HTTP');
+  const j = okJson(res, 'users/user');
   assert(j.uuid && j.username, 'uuid/username missing');
   ctx.user = j;
   return j.username;
