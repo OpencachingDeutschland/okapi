@@ -96,6 +96,7 @@ class WebService
 
         $notes = self::parse_notes($output);
         $processed_records = 0;
+        $draft_ids = array();
 
         foreach ($notes['records'] as $n)
         {
@@ -133,6 +134,7 @@ class WebService
                     '".Db::escape_string($text)."'
                 )
             ");
+            $draft_ids[] = (string)Db::last_insert_id();
             $processed_records++;
         }
 
@@ -144,7 +146,8 @@ class WebService
         $result = array(
             'success'           => true,
             'total_records'     => $notes['total_records'],
-            'processed_records' => $processed_records
+            'processed_records' => $processed_records,
+            'draft_ids'         => $draft_ids
         );
         return Okapi::formatted_response($request, $result);
     }

@@ -53,6 +53,9 @@
             <li><b>processed_records</b> - number of records actually inserted as draft
             logs; may be less than <b>total_records</b> when records are skipped (wrong
             platform prefix, unsupported log type, unknown cache code, invalid date)</li>
+            <li><b>draft_ids</b> - list of the IDs of the inserted draft logs, in input
+            order; see <a href="%OKAPI:methodargref:services/draftlogs/query%">services/draftlogs/query</a>
+            and <a href="%OKAPI:methodargref:services/draftlogs/delete%">services/draftlogs/delete</a></li>
         </ul>
     </returns>
 </xml>
