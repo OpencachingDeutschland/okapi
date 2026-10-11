@@ -55,6 +55,8 @@ class OkapiServiceRunner
         'services/lists/remove_caches',
         'services/lists/query',
         'services/lists/update',
+        'services/draftlogs/delete',
+        'services/draftlogs/query',
         'services/draftlogs/upload_fieldnotes',
         'services/logs/capabilities',
         'services/logs/delete',
