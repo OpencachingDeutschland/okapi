@@ -205,10 +205,18 @@ await check('level 3: user coordinates field (has_user_coords)', async () => {
   return `my_coords=${j.my_coords}`;
 });
 
+await check('level 3: draftlogs/query (has_draft_logs)', async () => {
+  needToken();
+  if (!ctx.installation?.has_draft_logs) skip('installation has no has_draft_logs');
+  const j = okJson(await api.request('services/draftlogs/query', {}, { auth: 'hmac' }), 'draftlogs/query');
+  assert(Array.isArray(j), 'not an array');
+  for (const d of j) assert(d.draft_id && d.cache_code && d.type && typeof d.needs_maintenance2 === 'boolean', 'draft without draft_id/cache_code/type/needs_maintenance2');
+  return `${j.length} drafts`;
+});
+
 // --- writing level (--write) ------------------------------------------------
 // Works on its own test cache, created first and archived last, so it touches no one
-// else's data. Everything it creates is removed again, except: the archived test cache
-// and the draft logs from the field notes upload (OKAPI has no service to delete drafts).
+// else's data. Everything it creates is removed again, except the archived test cache.
 
 if (write) {
   const stamp = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15);
@@ -304,7 +312,28 @@ if (write) {
     assert(j.success === true, `success is ${j.success}`);
     assert(j.total_records === records.length, `total_records ${j.total_records}, expected ${records.length}`);
     assert(j.processed_records === expected, `processed_records ${j.processed_records}, expected ${expected}`);
-    return `${j.processed_records} of ${j.total_records} records became drafts (left behind: no delete service)`;
+    assert(Array.isArray(j.draft_ids) && j.draft_ids.length === expected, `draft_ids ${JSON.stringify(j.draft_ids)}`);
+    w.draftIds = j.draft_ids;
+    return `${j.processed_records} of ${j.total_records} records became drafts ${j.draft_ids.join(', ')}`;
+  });
+
+  await check('write: draftlogs/query and delete', async () => {
+    needCache();
+    if (!w.draftIds) skip('no drafts uploaded');
+    const q = async () => okJson(await api.request('services/draftlogs/query', { cache_code: w.code }, { auth: 'hmac' }), 'draftlogs/query');
+    const drafts = await q();
+    assert(drafts.length === w.draftIds.length, `query returns ${drafts.length} drafts, expected ${w.draftIds.length}`);
+    const got = drafts.map(d => `${d.type}${d.needs_maintenance2 ? '+NM' : ''}`).join(', ');
+    assert(got === "Found it, Comment, Comment+NM", `types are ${got}`);
+    assert(drafts[1].comment === "Zeile 1<br />\nZeile 2 mit 'Zitat' &lt;3", `comment is ${JSON.stringify(drafts[1].comment)}`);
+    const del = await post('services/draftlogs/delete', { draft_ids: [...w.draftIds, '999999999'].join('|') }, 'draftlogs/delete');
+    assert(del.success === true, 'success is not true');
+    assert([...del.deleted_draft_ids].sort().join() === [...w.draftIds].sort().join(), `deleted ${JSON.stringify(del.deleted_draft_ids)}`);
+    assert(del.not_found_draft_ids.join() === '999999999', `not_found ${JSON.stringify(del.not_found_draft_ids)}`);
+    assert((await q()).length === 0, 'drafts still there after delete');
+    const bad = await api.request('services/draftlogs/delete', { draft_ids: 'abc' }, { auth: 'hmac', method: 'POST' });
+    assert(bad.status === 400, `invalid draft_ids: HTTP ${bad.status}, expected 400`);
+    return `${got}; deleted, unknown ID reported, invalid ID rejected`;
   });
 
   await check('write: logs/submit, edit, delete', async () => {
