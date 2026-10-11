@@ -3,6 +3,7 @@
 namespace okapi\services\caches\delete;
 
 use okapi\core\Db;
+use okapi\Settings;
 use okapi\core\Exception\BadRequest;
 use okapi\core\Exception\InvalidParam;
 use okapi\core\Okapi;
@@ -19,6 +20,10 @@ class WebService
 
     public static function call(OkapiRequest $request)
     {
+        # Writes the OCDE database layout; other installations would fail half-way.
+        if (Settings::get('OC_BRANCH') != 'oc.de')
+            throw new BadRequest('This method is not supported in this OKAPI installation.');
+
         $user_id = $request->token->user_id;
 
         $cache_code = $request->get_parameter('cache_code');

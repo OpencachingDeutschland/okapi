@@ -234,11 +234,16 @@ if (write) {
 
   await check('write: caches/create', async () => {
     needToken();
-    const j = await post('services/caches/create', {
+    const params = {
       cache_name: `okapi-test ${stamp}`, cache_type: 'Traditional', latitude: lat, longitude: lon,
       difficulty: '1.5', terrain: '1.5', size2: 'micro',
       short_description: 'Created by the OKAPI test suite; archived again at the end of the run.',
-    }, 'caches/create');
+    };
+    const res = await api.request('services/caches/create', params, { auth: 'hmac', method: 'POST' });
+    // caches/create, update and delete exist for OCDE only.
+    if (res.status === 400 && /not supported in this OKAPI installation/.test(res.text))
+      skip('caches/create is not supported by this installation (OCDE only)');
+    const j = okJson(res, 'caches/create');
     assert(j.cache_code, `no cache_code: ${JSON.stringify(j)}`);
     w.code = j.cache_code;
     const c = await read('code|name|status|owner');
