@@ -36,6 +36,7 @@ const api = new OkapiClient(target);
 
 const results = [];
 const ctx = {};  // values shared between checks (installation, a cache code, the user)
+const dumps = [];  // full responses printed before the results, so every run shows what it ran against
 
 class Skip extends Error {}
 const skip = reason => { throw new Skip(reason); };
@@ -72,6 +73,7 @@ async function check(name, fn) {
 await check('installation: basic fields', async () => {
   const j = okJson(await api.request('services/apisrv/installation', {}, { auth: 'none' }), 'installation');
   ctx.installation = j;
+  dumps.push(['services/apisrv/installation', j]);
   assert(typeof j.site_name === 'string', 'site_name missing');
   assert(typeof j.okapi_base_url === 'string', 'okapi_base_url missing');
   // A git checkout reports a number; standalone/dev setups may report a string such as "1.0.0".
@@ -180,6 +182,7 @@ await check('level 3: logs/capabilities', async () => {
   needToken();
   if (!ctx.cacheCode) skip('no cache code');
   const j = okJson(await api.request('services/logs/capabilities', { cache_code: ctx.cacheCode }, { auth: 'hmac' }), 'logs/capabilities');
+  dumps.push([`services/logs/capabilities (cache_code=${ctx.cacheCode})`, j]);
   assert(Array.isArray(j.submittable_logtypes), 'submittable_logtypes missing');
   return `submittable: ${j.submittable_logtypes.join(', ')}`;
 });
@@ -198,6 +201,7 @@ await check('level 3: user coordinates field (has_user_coords)', async () => {
 
 const mark = { pass: '✓', fail: '✗', skip: '–' };
 console.log(`OKAPI read-only suite: ${target.baseUrl}${targetName ? ` (target ${targetName})` : ''}\n`);
+for (const [title, data] of dumps) console.log(`${title}:\n${JSON.stringify(data, null, 2)}\n`);
 for (const r of results) console.log(`${mark[r.status]} ${r.name}${r.detail ? `: ${r.detail}` : ''}`);
 const count = s => results.filter(r => r.status === s).length;
 console.log(`\n${count('pass')} passed, ${count('fail')} failed, ${count('skip')} skipped`);

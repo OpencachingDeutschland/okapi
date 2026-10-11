@@ -23,6 +23,10 @@ node run.mjs --target prod                # a named target from `targets` in con
 node run.mjs --expect-revision 3b41888    # also check the deployed okapi_git_revision
 ```
 
+The output starts with the full responses of `apisrv/installation` (what the
+installation can do) and `logs/capabilities` (what the user may log on the test
+cache), so every run documents what it ran against.
+
 What it checks:
 - level 0: `apisrv/installation` (fields, `has_*` flags, optionally the revision);
   error format for a missing consumer key
