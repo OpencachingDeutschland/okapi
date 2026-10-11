@@ -11,6 +11,34 @@ cp config.example.js config.js
 
 `config.js` is gitignored. Never commit it.
 
+## Regression suite (read-only)
+
+`run.mjs` runs a set of checks and reports pass/fail with an exit code
+(0 = all passed, 1 = a check failed, 2 = setup error). It only reads, so it is
+safe against any installation, including production.
+
+```bash
+node run.mjs                              # the default target (baseUrl etc. above)
+node run.mjs --target prod                # a named target from `targets` in config.js
+node run.mjs --expect-revision 3b41888    # also check the deployed okapi_git_revision
+```
+
+The output starts with the full responses of `apisrv/installation` (what the
+installation can do) and `logs/capabilities` (what the user may log on the test
+cache), so every run documents what it ran against.
+
+What it checks:
+- level 0: `apisrv/installation` (fields, `has_*` flags, optionally the revision);
+  error format for a missing consumer key
+- level 1: unknown consumer key rejected; `caches/search/all`, `caches/geocache`, `logs/logs`
+- level 3: `users/user` signed with PLAINTEXT and with HMAC-SHA1 (both must work and
+  return the same user); HMAC with parameters that need percent-encoding; a wrong
+  secret is rejected; `logs/capabilities`; `my_coords` when `has_user_coords` is set
+
+Levels whose credentials a target lacks are skipped, not failed. Credentials are
+per installation: get a consumer key from the installation's `okapi/signup.html`
+and an access token for your test user.
+
 ## Finding a valid cache code
 
 ```bash
