@@ -61,6 +61,12 @@ The writing level works on its own test cache, so it touches no one else's data:
 7. `logs/submit` a Comment, `logs/edit`, `logs/delete`
 8. `caches/delete`: the test cache is archived, always last
 
+On installations without `caches/create` (OCPL), set `writeCache` in the target to
+an existing cache code, of type Multi, Quiz or Other (OCPL accepts user coordinates only
+on those). Steps 3–7 then run on that cache; steps 1, 2 and 8 are skipped,
+so the cache itself is never changed. Only per-user data is written (own coordinates,
+personal note, a list, drafts, one Comment log), and all of it is removed again.
+
 Left behind per run: the archived test cache and three draft logs (OKAPI has no
 service to delete drafts). Step 7 is skipped in OKAPI standalone mode, where
 `logs/submit` lacks the website's `OcHTMLPurifier`.

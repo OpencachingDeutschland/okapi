@@ -19,5 +19,8 @@ export const targets = {
     accessToken:    '',
     tokenSecret:    '',
     allowWrite:     false,   // never true for production
+    // writeCache:  'OP00C2', // installations without caches/create (OCPL): an existing
+    //                        // cache for --write; only per-user data is written to it.
+    //                        // OCPL accepts user coordinates only on Multi, Quiz and Other.
   },
 };
