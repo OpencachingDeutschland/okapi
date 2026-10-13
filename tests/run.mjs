@@ -26,8 +26,8 @@ function loadTarget(name) {
     }
     return t;
   }
-  const { baseUrl, consumerKey, consumerSecret, accessToken, tokenSecret, allowWrite, writeLocation } = config;
-  return { baseUrl, consumerKey, consumerSecret, accessToken, tokenSecret, allowWrite, writeLocation };
+  const { baseUrl, consumerKey, consumerSecret, accessToken, tokenSecret, allowWrite, writeLocation, writeCache } = config;
+  return { baseUrl, consumerKey, consumerSecret, accessToken, tokenSecret, allowWrite, writeLocation, writeCache };
 }
 
 const targetName = opt('target');
@@ -221,6 +221,8 @@ await check('level 3: draftlogs/query (has_draft_logs)', async () => {
 // --- writing level (--write) ------------------------------------------------
 // Works on its own test cache, created first and archived last, so it touches no one
 // else's data. Everything it creates is removed again, except the archived test cache.
+// Installations without caches/create (OCPL) use the target's writeCache instead: an
+// existing cache, which is never updated or archived; only per-user data is written.
 
 if (write) {
   const stamp = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15);
@@ -241,8 +243,10 @@ if (write) {
     };
     const res = await api.request('services/caches/create', params, { auth: 'hmac', method: 'POST' });
     // caches/create, update and delete exist for OCDE only.
-    if (res.status === 400 && /not supported in this OKAPI installation/.test(res.text))
-      skip('caches/create is not supported by this installation (OCDE only)');
+    if (res.status === 400 && /not supported in this OKAPI installation/.test(res.text)) {
+      if (target.writeCache) { w.code = target.writeCache; w.foreign = true; }
+      skip(`caches/create is not supported by this installation (OCDE only)${w.foreign ? `; using writeCache ${w.code}` : ''}`);
+    }
     const j = okJson(res, 'caches/create');
     assert(j.cache_code, `no cache_code: ${JSON.stringify(j)}`);
     w.code = j.cache_code;
@@ -253,6 +257,7 @@ if (write) {
 
   await check('write: caches/update', async () => {
     needCache();
+    if (w.foreign) skip('writeCache is not the test user\'s cache');
     const name = `okapi-test ${stamp} (updated)`;
     await post('services/caches/update', { cache_code: w.code, cache_name: name, difficulty: '2.5' }, 'caches/update');
     const c = await read('name|difficulty');
@@ -355,7 +360,8 @@ if (write) {
     assert(j.success === true && j.log_uuids?.length, `submit failed: ${j.message ?? JSON.stringify(j)}`);
     const uuid = j.log_uuids[0];
     try {
-      const e = await post('services/logs/edit', { log_uuid: uuid, comment: `okapi-test log ${stamp} (edited)` }, 'logs/edit');
+      const e = await post('services/logs/edit',
+        { log_uuid: uuid, comment: `okapi-test log ${stamp} (edited)`, comment_format: 'plaintext' }, 'logs/edit');
       assert(e.success === true, `edit failed: ${e.message ?? JSON.stringify(e)}`);
     } finally {
       const d = await post('services/logs/delete', { log_uuid: uuid }, 'logs/delete');
@@ -367,6 +373,7 @@ if (write) {
   // Always last: archive the test cache, even if checks above failed.
   await check('write: caches/delete (archive the test cache)', async () => {
     needCache();
+    if (w.foreign) skip('writeCache is not the test user\'s cache');
     await post('services/caches/delete', { cache_code: w.code, reason: 'okapi test suite cleanup' }, 'caches/delete');
     const c = await read('status');
     assert(c.status === 'Archived', `status is ${c.status}`);
