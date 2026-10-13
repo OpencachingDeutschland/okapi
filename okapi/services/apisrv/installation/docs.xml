@@ -114,6 +114,12 @@
                 is available.</p>
             </li>
             <li>
+                <p><b>has_lists</b> - boolean, <b>true</b> if this installation
+                supports geocache lists. Use this to determine whether the
+                <a href="%OKAPI:methodargref:services/lists/create%">services/lists/*</a>
+                family of methods is available.</p>
+            </li>
+            <li>
                 <p><b>has_user_coords</b> - boolean, <b>true</b> if users can store
                 their own coordinates of geocaches with
                 <a href="%OKAPI:methodref:services/caches/save_user_coords%">services/caches/save_user_coords</a>
