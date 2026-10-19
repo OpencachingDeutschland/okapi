@@ -61,7 +61,7 @@ The writing level works on its own test cache, so it touches no one else's data:
 7. `logs/submit` a Comment, `logs/edit`, `logs/delete`
 8. `caches/delete`: the test cache is archived, always last
 
-On installations without `caches/create` (OCPL), set `writeCache` in the target to
+Steps 1, 2 and 8 run only where `has_cache_editing` is set (OCDE). Elsewhere (OCPL), set `writeCache` in the target to
 an existing cache code, of type Multi, Quiz or Other (OCPL accepts user coordinates only
 on those). Steps 3–7 then run on that cache; steps 1, 2 and 8 are skipped,
 so the cache itself is never changed. Only per-user data is written (own coordinates,
