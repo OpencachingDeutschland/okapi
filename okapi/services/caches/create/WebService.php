@@ -33,12 +33,11 @@ class WebService
         $cache_type = $request->get_parameter('cache_type');
         if (!$cache_type)
             throw new InvalidParam('cache_type', 'cache_type is mandatory.');
-        # Traditional only, for now: the simple listing an app creates in the field.
-        # Other types are created on the website (on OCDE, additional waypoints
-        # are always public, so stages and finals can't be kept secret here).
-        if ($cache_type != 'Traditional')
-            throw new InvalidParam('cache_type', 'Only Traditional caches can be created through OKAPI; create other types on the website.');
-        $type_id = Okapi::cache_type_name2id($cache_type);
+        try {
+            $type_id = Okapi::cache_type_name2id($cache_type);
+        } catch (\Exception $e) {
+            throw new InvalidParam('cache_type', "Unknown cache type '$cache_type'.");
+        }
 
         list($latitude, $longitude) = CacheEditCommon::parse_location(
             $request->get_parameter('latitude'), $request->get_parameter('longitude'));
@@ -85,7 +84,7 @@ class WebService
         $waypoints = [];
         $alt_wpts = $request->get_parameter('alt_wpts');
         if ($alt_wpts !== null && $alt_wpts !== '')
-            $waypoints = CacheEditCommon::parse_waypoints('alt_wpts', $alt_wpts, ['parking', 'path', 'poi']);
+            $waypoints = CacheEditCommon::parse_waypoints('alt_wpts', $alt_wpts);
 
         # Publishing, as the choices of the website's form: now, later (at a
         # given day and full hour; the website publishes it then), or not now

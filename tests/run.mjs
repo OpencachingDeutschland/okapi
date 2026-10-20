@@ -255,6 +255,8 @@ if (write) {
       alt_wpts: JSON.stringify([
         { location: `${lat}|${lon}`, type: 'parking', description: 'parking' },
         { location: `${lat}|${lon}`, type: 'poi', description: 'viewpoint' },
+        { location: `${lat}|${lon}`, type: 'stage', description: 'stage 1' },
+        { location: `${lat}|${lon}`, type: 'final', description: 'final, public on purpose' },
       ]),
     };
     const j = await post('services/caches/create', params, 'caches/create');
@@ -266,22 +268,46 @@ if (write) {
     assert(c.size2 === 'micro', `size2 is ${c.size2}`);
     assert(!c.description.includes('<b>'), `plain-text description not escaped: ${c.description}`);
     assert(c.hint2 === 'under the <stone>', `hint2 is ${JSON.stringify(c.hint2)}`);
-    assert(c.alt_wpts.map(x => x.type).join() === 'parking,poi', `alt_wpts are ${c.alt_wpts.map(x => x.type)}`);
+    assert(c.alt_wpts.map(x => x.type).join() === 'parking,poi,stage,final', `alt_wpts are ${c.alt_wpts.map(x => x.type)}`);
     // Refused as on the website; none of these creates a cache.
     const day = n => new Date(Date.now() + n * 86400e3).toISOString().slice(0, 10);
     for (const [what, extra] of [
       ['difficulty 1.3', { difficulty: '1.3' }],
       ['same coordinates as an active cache', {}],
       ['hidden after publishing', { date_hidden: day(1), latitude: '52.4' }],
-      ['a type other than Traditional', { cache_type: 'Multi', latitude: '52.4' }],
-      ['a final waypoint', { latitude: '52.4', alt_wpts: JSON.stringify([{ location: '52.4|9.5', type: 'final' }]) }],
+      ['an unknown cache type', { cache_type: 'Bonus', latitude: '52.4' }],
+      ['an unknown waypoint type', { latitude: '52.4', alt_wpts: JSON.stringify([{ location: '52.4|9.5', type: 'treasure' }]) }],
       ['publish=later without a date', { publish: 'later', latitude: '52.4' }],
       ['unknown publish choice', { publish: 'soon', latitude: '52.4' }],
     ]) {
       const r = await api.request('services/caches/create', { ...params, ...extra }, { auth: 'hmac', method: 'POST' });
       assert(r.status === 400, `${what}: HTTP ${r.status}, expected 400`);
     }
-    return `${w.code} (${c.status}), description escaped, 2 waypoints; 7 rules refused`;
+    return `${w.code} (${c.status}), description escaped, 4 waypoints; 7 rules refused`;
+  });
+
+  // Listings sent unpublished, to be finished on the website: any cache type.
+  // Unpublished caches can't be archived through OKAPI, so each run leaves these behind.
+  await check('write: caches/create, not published (Traditional, Multi, Quiz)', async () => {
+    needToken();
+    if (!ctx.installation?.has_cache_editing) skip('installation has no has_cache_editing');
+    const codes = [];
+    for (const [i, type] of ['Traditional', 'Multi', 'Quiz'].entries()) {
+      const j = await post('services/caches/create', {
+        cache_name: `okapi-test ${stamp} ${type} unpublished`, cache_type: type,
+        latitude: lat, longitude: (Number(lon) + 0.001 * (i + 1)).toFixed(6),
+        difficulty: '3', terrain: '1.5', size2: 'small', country: 'DE', publish: 'notnow',
+        description: 'Finished on the website.',
+      }, `caches/create ${type}`);
+      assert(j.cache_code, `${type}: no cache_code: ${JSON.stringify(j)}`);
+      const r = await api.request('services/caches/geocache', { cache_code: j.cache_code, fields: 'code' }, { auth: 'hmac' });
+      assert(r.status === 400, `${type}: unpublished cache visible through geocache (HTTP ${r.status})`);
+      const u = okJson(await api.request('services/caches/update', { cache_code: j.cache_code, terrain: '2' },
+        { auth: 'hmac', method: 'POST' }), `caches/update unpublished ${type}`);
+      assert(u.changed.join() === 'terrain', `${type}: changed is ${u.changed}`);
+      codes.push(j.cache_code);
+    }
+    return `${codes.join(', ')}; not visible through geocache, update works`;
   });
 
   await check('write: caches/update', async () => {
@@ -298,7 +324,7 @@ if (write) {
     assert(c.name === name, `name is '${c.name}'`);
     assert(Number(c.difficulty) === 2.5, `difficulty is ${c.difficulty}`);
     assert(c.hint2 === '', `hint2 not removed: ${JSON.stringify(c.hint2)}`);
-    assert(c.alt_wpts.map(x => x.type).join() === 'poi', `alt_wpts after removal: ${c.alt_wpts.map(x => x.type)}`);
+    assert(c.alt_wpts.map(x => x.type).join() === 'poi,stage,final', `alt_wpts after removal: ${c.alt_wpts.map(x => x.type)}`);
     const pw = okJson(await update({ passwd: 'okapitest' }), 'caches/update passwd');
     assert(pw.changed.join() === 'passwd' && (await read('req_passwd')).req_passwd === true, `passwd not set: ${pw.changed}`);
     const nopw = okJson(await update({ passwd: '' }), 'caches/update passwd clear');
@@ -483,12 +509,13 @@ if (write) {
   });
 
   // Status changes are status logs (services/logs/submit), so they need a full website.
+  // OCDE records each status change in cache_status_modified, keyed by cache and second,
+  // so two changes of one cache within the same second collide: wait a little before each.
   const status = async (method, expected) => {
+    await new Promise(r => setTimeout(r, 1100));
     const res = await api.request(`services/caches/${method}`,
       { cache_code: w.code, comment: `okapi-test ${method}` }, { auth: 'hmac', method: 'POST' });
     if (/OcHTMLPurifier/.test(res.text)) skip('OKAPI runs without the website (OcHTMLPurifier missing)');
-    // Known, separate: logs/submit doesn't set cache_logs.picture, which has no default on OCDE (strict SQL).
-    if (/Field 'picture' doesn't have a default/.test(res.text)) skip('logs/submit fails under strict SQL (cache_logs.picture has no default)');
     const j = okJson(res, `caches/${method}`);
     assert(j.success === true && j.log_uuid, `${method} failed: ${j.message ?? JSON.stringify(j)}`);
     const c = await read('status');
