@@ -1,5 +1,7 @@
-// Creates 36 caches arranged in a circle for testing
-// Usage: node oc-create-circle.mjs
+// Creates 36 mystery (Quiz) caches arranged in a circle for testing
+// Usage: node oc-create-circle.mjs [--notnow]
+//   --notnow: submit them unpublished (listing coordinates only, finished on the website);
+//             unpublished caches are not visible through OKAPI, so oc-cleanup-circle.mjs can't find them
 import { okapiPost } from './oauth.mjs';
 
 const LOREM_IPSUM = `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.`;
@@ -9,6 +11,7 @@ const CENTER_LAT = 52.327366;  // N52 19.642
 const CENTER_LON = 9.543;      // E009 32.580
 const RADIUS_DEGREES = 0.035;  // ~3.5 km radius at this latitude
 const NUM_CACHES = 36;
+const PUBLISH = process.argv.includes('--notnow') ? 'notnow' : 'now';
 
 // Generate cache coordinates
 function generateCircleCoordinates() {
@@ -30,7 +33,7 @@ function generateCircleCoordinates() {
 const caches = generateCircleCoordinates();
 
 console.log(`Creating ${NUM_CACHES} caches in a circle around N${CENTER_LAT.toFixed(6)} E${CENTER_LON.toFixed(6)}`);
-console.log(`Radius: ${RADIUS_DEGREES}° (approximately 3-4 km)\n`);
+console.log(`Radius: ${RADIUS_DEGREES}° (approximately 3-4 km), publish=${PUBLISH}\n`);
 
 let created = 0;
 let failed = 0;
@@ -48,6 +51,8 @@ for (const cache of caches) {
     short_description: `Mystery cache #${cache.number}`,
     description: LOREM_IPSUM,
     hint2: 'Look carefully around the coords.',
+    country: 'DE',
+    publish: PUBLISH,
   });
 
   if (result.cache_code) {
