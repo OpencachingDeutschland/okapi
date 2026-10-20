@@ -1,0 +1,5 @@
+OC17C1C,2026-06-03T10:00:00Z,Found it,"Die drei Kekse gefunden. Toller Quiz-Cache, hat etwas gedauert aber dann war's klar."
+OC17C24,2026-06-03T10:30:00Z,Found it,"Rückhaltebecken - schöne Lage, gut versteckt."
+OC17C2A,2026-06-03T11:00:00Z,Didn't find it,"Leider nicht gefunden, werde es nochmal versuchen."
+GC9XYZ1,2026-06-03T11:15:00Z,Found it,"This is a GC entry — should be silently skipped by OKAPI."
+OC17C2B,2026-06-03T12:00:00Z,Comment,"Hohlohturm ist wirklich sehenswert, auch ohne Cache."
