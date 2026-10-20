@@ -19,7 +19,7 @@ if (!codes || codes.length === 0) {
     process.exit(0);
 }
 
-// caches/delete takes OC codes, so look up which codes are the Nut caches
+// caches/archive takes OC codes, so look up which codes are the Nut caches
 const details = await okapiGet('services/caches/geocaches', {
     cache_codes: codes.join('|'),
     fields: 'code|name',
@@ -35,7 +35,7 @@ let deleted = 0;
 let failed = 0;
 
 for (const cache of nuts) {
-    const result = await okapiPost('services/caches/delete', {
+    const result = await okapiPost('services/caches/archive', {
         cache_code: cache.code,
     });
     if (result.success) {

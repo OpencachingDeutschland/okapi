@@ -44,7 +44,7 @@ let deleted = 0;
 let failed = 0;
 
 for (const cache of oddNuts) {
-    const result = await okapiPost('services/caches/delete', {
+    const result = await okapiPost('services/caches/archive', {
         cache_code: cache.code,
     });
 
