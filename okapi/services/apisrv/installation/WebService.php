@@ -36,7 +36,6 @@ class WebService
         $result['has_draft_logs'] = Settings::get('OC_BRANCH') == 'oc.de';
         $result['has_lists']      = Settings::get('OC_BRANCH') == 'oc.de';
         $result['has_cache_editing'] = Settings::get('OC_BRANCH') == 'oc.de';
-        $result['has_user_coords'] = true;
         if (Settings::get('OC_BRANCH') == 'oc.de') {
             $result['cache_types'] = Okapi::get_local_cachetypes();
             $result['log_types']   = Okapi::get_submittable_logtype_names();
@@ -44,5 +43,4 @@ class WebService
 
         return Okapi::formatted_response($request, $result);
     }
-
 }

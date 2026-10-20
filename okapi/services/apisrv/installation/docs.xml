@@ -121,31 +121,27 @@
             </li>
             <li>
                 <p><b>has_cache_editing</b> - boolean, <b>true</b> if owners can
-                create, update and archive their geocaches with
-                <a href="%OKAPI:methodref:services/caches/create%">services/caches/create</a>,
-                <a href="%OKAPI:methodref:services/caches/update%">services/caches/update</a> and
-                <a href="%OKAPI:methodref:services/caches/delete%">services/caches/delete</a>.
-                Older installations don't return this field; treat that as <b>false</b>.</p>
+                create geocaches and change their listings with
+                <a href="%OKAPI:methodref:services/caches/create%">services/caches/create</a> and
+                <a href="%OKAPI:methodref:services/caches/update%">services/caches/update</a>.
+                Older installations don't return this field; treat that as <b>false</b>.
+                (Archiving, disabling and enabling work everywhere, see
+                <a href="%OKAPI:methodref:services/caches/archive%">services/caches/archive</a>.)</p>
             </li>
             <li>
-                <p><b>has_user_coords</b> - boolean, <b>true</b> if users can store
-                their own coordinates of geocaches with
-                <a href="%OKAPI:methodref:services/caches/save_user_coords%">services/caches/save_user_coords</a>
-                and read them with the <b>my_coords</b> field of
-                <a href="%OKAPI:methodargref:services/caches/geocache#fields%">services/caches/geocache</a>.
-                Older installations don't return this field; treat that as <b>false</b>.</p>
+                <p><b>cache_types</b> - list of the OKAPI cache type names this
+                installation uses (e.g. <b>Traditional</b>, <b>Multi</b>).
+                Only present when <b>has_draft_logs</b> is true.</p>
             </li>
             <li>
-                <p><b>cache_types</b> - list of cache type names supported by this
-                installation. Only present when <b>has_draft_logs</b> is true.
-                Values are OKAPI cache type names (e.g. <b>Traditional</b>,
-                <b>Multi-cache</b>).</p>
-            </li>
-            <li>
-                <p><b>log_types</b> - list of log type names that can be submitted
-                on this installation. Only present when <b>has_draft_logs</b> is true.
-                Use these values when uploading fieldnotes via
-                <a href="%OKAPI:methodargref:services/draftlogs/upload_fieldnotes%">services/draftlogs/upload_fieldnotes</a>.</p>
+                <p><b>log_types</b> - list of the log type names that
+                <a href="%OKAPI:methodref:services/logs/submit%">services/logs/submit</a>
+                accepts. It is the same list on every installation; whether a
+                particular log is allowed depends on the geocache and the user (see
+                <a href="%OKAPI:methodref:services/logs/capabilities%">services/logs/capabilities</a>).
+                Only present when <b>has_draft_logs</b> is true. Field notes uploaded with
+                <a href="%OKAPI:methodref:services/draftlogs/upload_fieldnotes%">services/draftlogs/upload_fieldnotes</a>
+                use their own set of log type names, listed there.</p>
             </li>
         </ul>
     </returns>

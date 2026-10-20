@@ -139,11 +139,8 @@
                 (<i>lat</i> and <i>lon</i> are in full degrees with a dot as a decimal point),
             </li>
             <li>
-                <p><b>type</b> - cache type, one of the type codes that are included
-                in the <b>types</b> field of
-                <a href='%OKAPI:methodargref:services/caches/capabilities%'>services/caches/capabilities</a>.
-                Currently there are eight types which are in use at all OKAPI
-                installations:</p>
+                <p><b>type</b> - cache type. Currently there are eight types
+                which are in use at all OKAPI installations:</p>
                 <ul>
                     <li><b>Traditional</b>,</li>
                     <li><b>Multi</b>,</li>
@@ -334,7 +331,7 @@
                 <p><b>Note:</b> Some installations don't provide ratings for
                 their geocaches; they will always return <b>null</b> for this
                 field. The <b>has_ratings</b> field of
-                <a href='%OKAPI:methodargref:services/caches/capabilities%'>services/caches/capabilities</a>
+                <a href='%OKAPI:methodargref:services/apisrv/installation%'>services/apisrv/installation</a>
                 tells if ratings are available.</p>
 
                 <p><b>Note:</b> Currently OC sites expose cache ratings as integers only.
@@ -348,7 +345,7 @@
 
                 <p><b>Note:</b> Some installations don't provide ratings for their geocaches;
                 they will always return <b>0</b> for this field. The <b>has_ratings</b> field of
-                <a href='%OKAPI:methodargref:services/caches/capabilities%'>services/caches/capabilities</a>
+                <a href='%OKAPI:methodargref:services/apisrv/installation%'>services/apisrv/installation</a>
                 tells if ratings are available.</p>
             </li>
             <li>
@@ -480,7 +477,7 @@
                 <p>This field requires you to use the <b>Level 3</b> Authentication.</p>
             </li>
             <li>
-                <p><b>my_coords</b> - user's own (corrected) coordinates of the cache,
+                <p><b>user_coords</b> - user's own (corrected) coordinates of the cache,
                 in the same "lat|lon" format as <b>location</b>, or <b>null</b> if
                 the user hadn't defined any. Use the
                 <a href="%OKAPI:methodref:services/caches/save_user_coords%">services/caches/save_user_coords</a>

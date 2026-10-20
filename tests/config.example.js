@@ -7,6 +7,9 @@ export const tokenSecret    = 'YOUR_TOKEN_SECRET';
 export const baseUrl        = 'https://okapi.example.org';
 // Allow run.mjs --write on this target (dev/test installations only, never production).
 export const allowWrite     = false;
+// Installations without caches/create (OCPL): the existing cache run.mjs --write writes
+// per-user data to. On OCPL use a Multi, Quiz or Other cache (user coordinates).
+export const writeCache     = '';
 
 // Optional named targets for run.mjs (`node run.mjs --target prod`). Each needs its own
 // credentials, issued by that installation. Leave fields empty to skip the levels that
@@ -19,8 +22,6 @@ export const targets = {
     accessToken:    '',
     tokenSecret:    '',
     allowWrite:     false,   // never true for production
-    // writeCache:  'OP00C2', // installations without caches/create (OCPL): an existing
-    //                        // cache for --write; only per-user data is written to it.
-    //                        // OCPL accepts user coordinates only on Multi, Quiz and Other.
+    // writeCache:  'OC1234', // an existing cache for --write; only per-user data is written to it
   },
 };
