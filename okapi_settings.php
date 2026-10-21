@@ -62,5 +62,14 @@ function get_okapi_settings()
         'SITE_LOGO'                 => $ocUrl . 'resource2/ocstyle/images/oclogo/oc_logo_alpha3.png',
         'VERSION_FILE'              => __DIR__ . '/okapi/meta.php',
         'GITHUB_ACCESS_TOKEN'       => '',
+        // Account creation through services/users/register, with the dev website's values
+        // (settings-dist: password_hash false, license newusers 2).
+        'OCDE_REGISTRATION'         => [
+            'password_hash' => false,
+            'password_salt' => '',
+            'data_license'  => 2,
+            'terms_url'     => $ocUrl . 'articles.php?page=impressum#tos',
+            'privacy_url'   => $ocUrl . 'articles.php?page=dsb',
+        ],
     ];
 }
