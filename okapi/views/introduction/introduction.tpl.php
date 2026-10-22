@@ -5,7 +5,6 @@
         <title>OKAPI - Opencaching API</title>
         <link rel="stylesheet" href="<?= $vars['okapi_base_url'] ?>static/common.css?<?= $vars['okapi_rev'] ?>">
         <link rel="icon" type="image/x-icon" href="<?= $vars['okapi_base_url'] ?>static/favicon.ico">
-        <script src='https://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js'></script>
         <script>
             var okapi_base_url = "<?= $vars['okapi_base_url'] ?>";
         </script>
@@ -162,6 +161,28 @@ applications you won't have learn OAuth.</p>
 also use the HTTP <code>Authorization</code> header for passing OAuth
 arguments. OKAPI does not support other HTTP request types (such as PUT or
 DELETE).</p>
+
+
+<h2 id='signature_methods'>Signature methods</h2>
+
+<p>OKAPI accepts two OAuth signature methods:</p>
+
+<ul>
+    <li><b>HMAC-SHA1</b>, over HTTP and HTTPS. This is what most OAuth 1.0a
+    libraries use, and what the examples above show.</li>
+    <li><b>PLAINTEXT</b>, over HTTPS only. The signature is your Consumer Secret
+    and your Token Secret, each percent-encoded, joined with <code>&amp;</code>
+    (for Level 2, the Token Secret part is empty). Over plain HTTP, PLAINTEXT is
+    refused, because it would send your secrets unencrypted.</li>
+</ul>
+
+<p>Over HTTPS, OKAPI also skips the <code>oauth_timestamp</code> and
+<code>oauth_nonce</code> checks, whatever the signature method. HTTPS already
+protects the request, so you may leave these two parameters out.</p>
+
+<p>Which connection counts as HTTPS is decided by the site's web server. If
+the site sits behind a proxy that ends HTTPS, the proxy has to tell PHP so.
+Otherwise OKAPI treats the request as plain HTTP.</p>
 
 
 <h2 id='html'>A warning about HTML fields</h2>
@@ -395,7 +416,8 @@ dictionary may contain additional keys. Currently possible values of the
             <li>
                 <p><b>[ "invalid_oauth_request", "unsupported_signature_method"]</b>
                 - you tried to use an unsupported OAuth signature method (OKAPI
-                requires HMAC-SHA1).</p>
+                accepts HMAC-SHA1, and PLAINTEXT over HTTPS; see
+                <a href='#signature_methods'>Signature methods</a>).</p>
             </li>
             <li>
                 <p><b>[ "invalid_oauth_request", "invalid_consumer"]</b> - your
