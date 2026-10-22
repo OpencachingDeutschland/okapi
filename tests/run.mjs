@@ -137,6 +137,8 @@ await check('level 1: users/register refuses what the website refuses', async ()
   const reg = params => api.request('services/users/register', params, { method: 'POST' });
   const probe = await reg({ username: 'a', email: 'x', password: 'x', accept_terms: 'true' });
   if (probe.status === 400 && /may not register users/.test(probe.text)) skip('this consumer may not register users (FLAG_REGISTER_USERS)');
+  // OKAPI accepts registrations only over HTTPS (dev installations may relax this in DEBUG mode)
+  if (target.baseUrl.startsWith('http:') && probe.status === 400 && /only over HTTPS/.test(probe.text)) skip('users/register needs HTTPS; this target uses plain HTTP');
   const cases = [
     [{ username: 'okapi test user', email: 'not-an-address', password: 'Wald-Weg 42', accept_terms: 'true' }, 'email', 'email_invalid'],
     [{ username: 'x', email: 'okapi-test@example.org', password: 'Wald-Weg 42', accept_terms: 'true' }, 'username', 'username_invalid'],
