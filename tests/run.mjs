@@ -329,14 +329,27 @@ if (write) {
         description: 'Finished on the website.',
       }, `caches/create ${type}`);
       assert(j.cache_code, `${type}: no cache_code: ${JSON.stringify(j)}`);
-      const r = await api.request('services/caches/geocache', { cache_code: j.cache_code, fields: 'code' }, { auth: 'hmac' });
-      assert(r.status === 400, `${type}: unpublished cache visible through geocache (HTTP ${r.status})`);
+      // only the owner sees it
+      const anon = await api.request('services/caches/geocache', { cache_code: j.cache_code, fields: 'code' }, { auth: 'key' });
+      assert(anon.status === 400, `${type}: unpublished cache visible without the owner's token (HTTP ${anon.status})`);
       const u = okJson(await api.request('services/caches/update', { cache_code: j.cache_code, terrain: '2' },
         { auth: 'hmac', method: 'POST' }), `caches/update unpublished ${type}`);
       assert(u.changed.join() === 'terrain', `${type}: changed is ${u.changed}`);
+      const own = okJson(await api.request('services/caches/geocache',
+        { cache_code: j.cache_code, fields: 'code|name|status|terrain|owner' }, { auth: 'hmac' }), `geocache unpublished ${type} as owner`);
+      assert(own.status === 'Not yet published', `${type}: owner sees status '${own.status}'`);
+      assert(Number(own.terrain) === 2 && own.owner.uuid === ctx.user?.uuid, `${type}: owner reads ${JSON.stringify(own)}`);
       codes.push(j.cache_code);
     }
-    return `${codes.join(', ')}; not visible through geocache, update works`;
+    // a status log would publish it past the website's rules: refused
+    const st = okJson(await api.request('services/logs/submit', { cache_code: codes[0], logtype: 'Ready to search', comment: '' },
+      { auth: 'hmac', method: 'POST' }), 'logs/submit status log on an unpublished cache');
+    assert(st.success === false, `status log accepted: ${JSON.stringify(st)}`);
+    // and no search lists it, not even the owner's own
+    const found = okJson(await api.request('services/caches/search/all', { owner_uuid: ctx.user.uuid, status: 'Available|Temporarily unavailable|Archived', limit: '500' },
+      { auth: 'hmac' }), 'search/all owner_uuid');
+    assert(!codes.some(c => found.results.includes(c)), 'unpublished cache listed by search/all');
+    return `${codes.join(', ')}; visible to the owner only ('Not yet published'), update works, status log refused, not in search`;
   });
 
   await check('write: caches/update', async () => {
