@@ -203,7 +203,7 @@ class WebService
                     "You are not the owner of this cache. Only the owner may log status changes."
                 ));
             }
-            if ($cache['status'] == 'Not yet published') {
+            if ($cache['status'] == 'Unpublished') {
                 # Publishing has its own rules on the website (now or at a date).
                 throw new CannotPublishException(_(
                     "This geocache is not published yet. It can be published only on the website."

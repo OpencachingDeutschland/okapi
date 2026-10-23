@@ -181,8 +181,8 @@ class WebService
         }
 
         # A cache that is not yet published (status 5 on both branches) is visible to its owner only,
-        # as on the website, so that an owner's app can read it back and finish it. Nobody else gets it,
-        # and no search method lists it.
+        # as on the website, so that an owner's app can read it back and finish it. Nobody else gets it;
+        # search methods list it only for status=Unpublished (SearchAssistant).
         $own_user_id = ($request->token != null) ? $request->token->user_id : -1;
 
         if (Settings::get('OC_BRANCH') == 'oc.de')
@@ -280,7 +280,7 @@ class WebService
                     case 'names': $entry['names'] = array(Settings::get('SITELANG') => $row['name']); break; // for the future
                     case 'location': $entry['location'] = Okapi::coords2latlon($row['latitude'], $row['longitude']); break;
                     case 'type': /* handled below */ break;
-                    case 'status': $entry['status'] = ($row['status'] == 5) ? 'Not yet published' : Okapi::cache_status_id2name($row['status']); break;
+                    case 'status': $entry['status'] = ($row['status'] == 5) ? 'Unpublished' : Okapi::cache_status_id2name($row['status']); break;
                     case 'needs_maintenance': $entry['needs_maintenance'] = $row['needs_maintenance'] > 0; break;
                     case 'url': $entry['url'] = Settings::get('SITE_URL')."viewcache.php?wp=".$row['wp_oc']; break;
                     case 'owner':
