@@ -228,6 +228,24 @@ await check('level 3: logs/capabilities', async () => {
   return `submittable: ${j.submittable_logtypes.join(', ')}`;
 });
 
+await check('level 3: own unpublished caches (status=Unpublished)', async () => {
+  needToken();
+  const search = auth => api.request('services/caches/search/all', { status: 'Unpublished', limit: '500' }, { auth });
+  const r = await search('hmac');
+  if (r.status === 400) skip('installation does not know status=Unpublished');
+  const j = okJson(r, 'search/all status=Unpublished');
+  if (j.results.length) {
+    const c = okJson(await api.request('services/caches/geocaches',
+      { cache_codes: j.results.join('|'), fields: 'status|owner' }, { auth: 'hmac' }), 'geocaches of own unpublished');
+    for (const [code, x] of Object.entries(c)) {
+      assert(x && x.status === 'Unpublished' && x.owner.uuid === ctx.user?.uuid, `${code}: ${JSON.stringify(x)}`);
+    }
+  }
+  const anon = await search('key');
+  assert(anon.status === 400, `status=Unpublished without a token: HTTP ${anon.status}, expected 400`);
+  return `${j.results.length} own unpublished caches, all 'Unpublished' and owned by the test user; refused without a token`;
+});
+
 // Whether an installation has a method: services/apiref/method answers 400 for unknown ones.
 const hasMethod = async name =>
   (await api.request('services/apiref/method', { name }, { auth: 'none' })).status === 200;
@@ -329,14 +347,37 @@ if (write) {
         description: 'Finished on the website.',
       }, `caches/create ${type}`);
       assert(j.cache_code, `${type}: no cache_code: ${JSON.stringify(j)}`);
-      const r = await api.request('services/caches/geocache', { cache_code: j.cache_code, fields: 'code' }, { auth: 'hmac' });
-      assert(r.status === 400, `${type}: unpublished cache visible through geocache (HTTP ${r.status})`);
+      // only the owner sees it
+      const anon = await api.request('services/caches/geocache', { cache_code: j.cache_code, fields: 'code' }, { auth: 'key' });
+      assert(anon.status === 400, `${type}: unpublished cache visible without the owner's token (HTTP ${anon.status})`);
       const u = okJson(await api.request('services/caches/update', { cache_code: j.cache_code, terrain: '2' },
         { auth: 'hmac', method: 'POST' }), `caches/update unpublished ${type}`);
       assert(u.changed.join() === 'terrain', `${type}: changed is ${u.changed}`);
+      const own = okJson(await api.request('services/caches/geocache',
+        { cache_code: j.cache_code, fields: 'code|name|status|terrain|owner' }, { auth: 'hmac' }), `geocache unpublished ${type} as owner`);
+      assert(own.status === 'Unpublished', `${type}: owner sees status '${own.status}'`);
+      assert(Number(own.terrain) === 2 && own.owner.uuid === ctx.user?.uuid, `${type}: owner reads ${JSON.stringify(own)}`);
       codes.push(j.cache_code);
     }
-    return `${codes.join(', ')}; not visible through geocache, update works`;
+    // a status log would publish it past the website's rules: refused
+    const st = okJson(await api.request('services/logs/submit', { cache_code: codes[0], logtype: 'Ready to search', comment: '' },
+      { auth: 'hmac', method: 'POST' }), 'logs/submit status log on an unpublished cache');
+    assert(st.success === false, `status log accepted: ${JSON.stringify(st)}`);
+    // search lists them only when asked for (status=Unpublished), and only to the owner
+    const search = (status, auth = 'hmac') => api.request('services/caches/search/all',
+      { owner_uuid: ctx.user.uuid, status, limit: '500' }, { auth });
+    const plain = okJson(await search('Available|Temporarily unavailable|Archived'), 'search/all without Unpublished');
+    assert(!codes.some(c => plain.results.includes(c)), 'unpublished cache listed without status=Unpublished');
+    const own = okJson(await search('Unpublished'), 'search/all status=Unpublished');
+    assert(codes.every(c => own.results.includes(c)), `status=Unpublished misses some of ${codes}: ${own.results}`);
+    const mixed = okJson(await search('Available|Unpublished'), 'search/all status=Available|Unpublished');
+    assert(codes.every(c => mixed.results.includes(c)), 'Available|Unpublished misses the unpublished caches');
+    const anonSearch = await search('Unpublished', 'key');
+    assert(anonSearch.status === 400, `status=Unpublished without a token: HTTP ${anonSearch.status}, expected 400`);
+    const others = okJson(await api.request('services/caches/search/all', { owner_uuid: '-' + ctx.user.uuid, status: 'Unpublished', limit: '500' },
+      { auth: 'hmac' }), 'search/all status=Unpublished, other owners');
+    assert(others.results.length === 0, `status=Unpublished returns caches of other users: ${others.results}`);
+    return `${codes.join(', ')}; visible to the owner only ('Unpublished'), update works, status log refused, searchable with status=Unpublished by the owner only`;
   });
 
   await check('write: caches/update', async () => {
